@@ -39,6 +39,8 @@ static void test_top_k(const std::vector<float> & probs, const std::vector<float
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-5);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_top_p(const std::vector<float> & probs, const std::vector<float> & expected_probs, float p) {
@@ -62,6 +64,8 @@ static void test_top_p(const std::vector<float> & probs, const std::vector<float
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-3);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_tfs(const std::vector<float> & probs, const std::vector<float> & expected_probs, float z) {
@@ -84,6 +88,8 @@ static void test_tfs(const std::vector<float> & probs, const std::vector<float> 
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-3);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_min_p(const std::vector<float> & probs, const std::vector<float> & expected_probs, float p) {
@@ -107,6 +113,8 @@ static void test_min_p(const std::vector<float> & probs, const std::vector<float
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-3);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_typical(const std::vector<float> & probs, const std::vector<float> & expected_probs, float p) {
@@ -129,6 +137,8 @@ static void test_typical(const std::vector<float> & probs, const std::vector<flo
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-3);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_repetition_penalties(
@@ -158,6 +168,8 @@ static void test_repetition_penalties(
     for (size_t i = 0; i < candidates_p.size; i++) {
         GGML_ASSERT(fabs(candidates_p.data[i].p - expected_probs[i]) < 1e-3);
     }
+
+    llama_sampling_free(smpl);
 }
 
 static void test_sampler_queue(const size_t n_vocab, const std::string & samplers_sequence, const int top_k, const float top_p, const float min_p
@@ -241,6 +253,8 @@ static void test_sampler_queue(const size_t n_vocab, const std::string & sampler
 
     printf("Sampler queue %3s OK with n_vocab=%05ld top_k=%05d top_p=%f min_p=%f\n",
            samplers_sequence.c_str(), n_vocab, top_k, top_p, min_p);
+
+    llama_sampling_free(smpl);
 }
 
 int main(void) {
