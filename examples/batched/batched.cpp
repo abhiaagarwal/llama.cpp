@@ -245,7 +245,7 @@ int main(int argc, char ** argv) {
     LOG_TEE("%s: decoded %d tokens in %.2f s, speed: %.2f t/s\n",
             __func__, n_decode, (t_main_end - t_main_start) / 1000000.0f, n_decode / ((t_main_end - t_main_start) / 1000000.0f));
 
-    llama_print_timings(ctx, smpl, nullptr);
+    llama_print_timings(ctx, smpl);
 
     fprintf(stderr, "\n");
 

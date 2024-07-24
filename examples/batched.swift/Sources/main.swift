@@ -214,7 +214,7 @@ let t_main_end = ggml_time_us()
 
 print("decoded \(n_decode) tokens in \(String(format: "%.2f", Double(t_main_end - t_main_start) / 1_000_000.0)) s, speed: \(String(format: "%.2f", Double(n_decode) / (Double(t_main_end - t_main_start) / 1_000_000.0))) t/s\n")
 
-llama_print_timings(context, smpl, nil)
+llama_print_timings(context, smpl)
 
 private func tokenize(text: String, add_bos: Bool) -> [llama_token] {
     let utf8Count = text.utf8.count

@@ -1,5 +1,8 @@
 #include "llama-sampling.h"
 
+#include "llama-vocab.h"
+#include "llama-grammar.h"
+
 #include <algorithm>
 #include <cstring>
 #include <ctime>
@@ -21,12 +24,53 @@ static void llama_log_softmax(float * array, size_t size) {
     }
 }
 
-struct llama_sampling * llama_sampling_init_impl(int32_t n_vocab) {
-    return new llama_sampling(n_vocab);
+llama_sampling::llama_sampling(uint32_t n_vocab) : n_vocab(n_vocab) {
+}
+
+llama_sampling::llama_sampling(const struct llama_vocab & vocab, const char * grammar_str, const char * grammar_root) : n_vocab(vocab.n_vocab) {
+    if (grammar_str != nullptr && grammar_str[0] != '\0') {
+        grammar = llama_grammar_init_impl(vocab, grammar_str, grammar_root);
+    }
+}
+
+llama_sampling::~llama_sampling() {
+    if (grammar) {
+        llama_grammar_free_impl(grammar);
+    }
+}
+
+struct llama_sampling * llama_sampling_init_impl(const struct llama_vocab & vocab, const char * grammar_str, const char * grammar_root) {
+    return new llama_sampling(vocab, grammar_str, grammar_root);
 }
 
 void llama_sampling_free_impl(struct llama_sampling * sampling) {
     delete sampling;
+}
+
+struct llama_sampling * llama_sampling_cp_impl(const struct llama_sampling & smpl) {
+    auto * result = new llama_sampling(smpl.n_vocab);
+
+    if (smpl.grammar) {
+        result->grammar = llama_grammar_copy_impl(*smpl.grammar);
+    }
+
+    return result;
+}
+
+void llama_sampling_reset_impl(struct llama_sampling & smpl, const char * grammar_str, const char * grammar_root) {
+    // TODO: this is dumb, need to fix
+    const struct llama_vocab * vocab = nullptr;
+
+    if (smpl.grammar) {
+        vocab = &smpl.grammar->vocab;
+
+        llama_grammar_free_impl(smpl.grammar);
+        smpl.grammar = nullptr;
+    }
+
+    if (grammar_str != nullptr && grammar_str[0] != '\0') {
+        smpl.grammar = llama_grammar_init_impl(*vocab, grammar_str, grammar_root);
+    }
 }
 
 void llama_sampling_set_rng_seed_impl(struct llama_sampling & smpl, uint32_t seed) {
@@ -397,6 +441,12 @@ void llama_sampling_temp_impl(struct llama_sampling & /*smpl*/, llama_token_data
     }
 }
 
+void llama_sampling_grammar_impl(struct llama_sampling & smpl, llama_token_data_array * candidates) {
+    if (smpl.grammar) {
+        llama_grammar_apply_impl(*smpl.grammar, candidates);
+    }
+}
+
 void llama_sampling_repetition_penalties_impl(
         struct llama_sampling & /*smpl*/,
        llama_token_data_array * candidates,
@@ -448,7 +498,7 @@ void llama_sampling_apply_guidance_impl(
     llama_log_softmax(logits, n_vocab);
     llama_log_softmax(logits_guidance, n_vocab);
 
-    for (int i = 0; i < n_vocab; ++i) {
+    for (uint32_t i = 0; i < n_vocab; ++i) {
               auto & l = logits[i];
         const auto & g = logits_guidance[i];
 
@@ -555,4 +605,12 @@ llama_token llama_sampling_sample_with_rng_impl(struct llama_sampling & smpl, ll
 
 llama_token llama_sampling_sample_impl(struct llama_sampling & smpl, llama_token_data_array * candidates) {
     return llama_sampling_sample_with_rng_impl(smpl, candidates, smpl.rng);
+}
+
+void llama_sampling_accept_impl(struct llama_sampling & smpl, llama_token token) {
+    // TODO: implement token storing in history
+
+    if (smpl.grammar) {
+        llama_grammar_accept_impl(*smpl.grammar, token);
+    }
 }

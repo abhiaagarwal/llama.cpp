@@ -106,7 +106,7 @@ static void sigint_handler(int signo) {
         } else {
             console::cleanup();
             printf("\n");
-            llama_print_timings(*g_ctx, (*g_ctx_sampling)->smpl, (*g_ctx_sampling)->grammar);
+            llama_print_timings(*g_ctx, (*g_ctx_sampling)->smpl);
             write_logfile(*g_ctx, *g_params, *g_model, *g_input_tokens, g_output_ss->str(), *g_output_tokens);
             _exit(130);
         }
@@ -735,7 +735,7 @@ int main(int argc, char ** argv) {
 
             const llama_token id = llama_sampling_sample(ctx_sampling, ctx, ctx_guidance);
 
-            llama_sampling_accept(ctx_sampling, ctx, id, /* apply_grammar= */ true);
+            llama_sampling_accept(ctx_sampling, id, /* apply_grammar= */ true);
 
             LOG("last: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, ctx_sampling->prev).c_str());
 
@@ -756,7 +756,7 @@ int main(int argc, char ** argv) {
 
                 // push the prompt in the sampling context in order to apply repetition penalties later
                 // for the prompt, we don't apply grammar rules
-                llama_sampling_accept(ctx_sampling, ctx, embd_inp[n_consumed], /* apply_grammar= */ false);
+                llama_sampling_accept(ctx_sampling, embd_inp[n_consumed], /* apply_grammar= */ false);
 
                 ++n_consumed;
                 if ((int) embd.size() >= params.n_batch) {
@@ -980,7 +980,7 @@ int main(int argc, char ** argv) {
         llama_state_save_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
     }
 
-    llama_print_timings(ctx, ctx_sampling->smpl, ctx_sampling->grammar);
+    llama_print_timings(ctx, ctx_sampling->smpl);
     write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 
     if (ctx_guidance) { llama_free(ctx_guidance); }

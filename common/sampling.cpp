@@ -2,41 +2,20 @@
 
 #include <random>
 
+struct llama_sampling_context * llama_sampling_init(const struct llama_sampling_params & params, const struct llama_model * model) {
+    auto result = llama_sampling_init(params, llama_sampling_init(model, params.grammar.c_str(), "root"));
+
+    result->owned = true;
+
+    return result;
+}
+
 struct llama_sampling_context * llama_sampling_init(const struct llama_sampling_params & params, struct llama_sampling * smpl) {
     struct llama_sampling_context * result = new llama_sampling_context();
 
-    result->params  = params;
-    result->smpl    = smpl;
-    result->grammar = nullptr;
-
-    // if there is a grammar, parse it
-    if (!params.grammar.empty()) {
-        result->parsed_grammar = grammar_parser::parse(params.grammar.c_str());
-
-        // will be empty (default) if there are parse errors
-        if (result->parsed_grammar.rules.empty()) {
-            fprintf(stderr, "%s: failed to parse grammar\n", __func__);
-            delete result;
-            return nullptr;
-        }
-
-        // Ensure that there is a "root" node.
-        if (result->parsed_grammar.symbol_ids.find("root") == result->parsed_grammar.symbol_ids.end()) {
-            fprintf(stderr, "%s: grammar does not contain a 'root' symbol\n", __func__);
-            delete result;
-            return nullptr;
-        }
-
-        std::vector<const llama_grammar_element *> grammar_rules(result->parsed_grammar.c_rules());
-
-        struct llama_grammar * grammar = llama_grammar_init(
-                grammar_rules.data(),
-                grammar_rules.size(), result->parsed_grammar.symbol_ids.at("root"));
-        if (grammar == nullptr) {
-            throw std::runtime_error("Failed to initialize llama_grammar");
-        }
-        result->grammar = grammar;
-    }
+    result->params = params;
+    result->owned  = false;
+    result->smpl   = smpl;
 
     result->prev.resize(params.n_prev);
 
@@ -48,30 +27,15 @@ struct llama_sampling_context * llama_sampling_init(const struct llama_sampling_
 }
 
 void llama_sampling_free(struct llama_sampling_context * ctx) {
-    if (ctx->grammar != NULL) {
-        llama_grammar_free(ctx->grammar);
+    if (ctx->owned) {
+        llama_sampling_free(ctx->smpl);
     }
 
     delete ctx;
 }
 
 void llama_sampling_reset(llama_sampling_context * ctx) {
-    if (ctx->grammar != NULL) {
-        llama_grammar_free(ctx->grammar);
-        ctx->grammar = NULL;
-    }
-
-    if (!ctx->parsed_grammar.rules.empty()) {
-        std::vector<const llama_grammar_element *> grammar_rules(ctx->parsed_grammar.c_rules());
-
-        struct llama_grammar * grammar = llama_grammar_init(
-                grammar_rules.data(),
-                grammar_rules.size(), ctx->parsed_grammar.symbol_ids.at("root"));
-        if (grammar == nullptr) {
-            throw std::runtime_error("Failed to initialize llama_grammar");
-        }
-        ctx->grammar = grammar;
-    }
+    llama_sampling_reset(ctx->smpl, ctx->params.grammar.c_str(), "root");
 
     std::fill(ctx->prev.begin(), ctx->prev.end(), 0);
     ctx->cur.clear();
@@ -79,15 +43,11 @@ void llama_sampling_reset(llama_sampling_context * ctx) {
 }
 
 void llama_sampling_cp(llama_sampling_context * src, llama_sampling_context * dst) {
-    if (dst->grammar) {
-        llama_grammar_free(dst->grammar);
-        dst->grammar = nullptr;
+    if (dst->smpl) {
+        llama_sampling_free(dst->smpl);
     }
 
-    if (src->grammar) {
-        dst->grammar = llama_grammar_copy(src->grammar);
-    }
-
+    dst->smpl = llama_sampling_cp(src->smpl);
     dst->prev = src->prev;
 }
 
@@ -277,7 +237,7 @@ static llama_token llama_sampling_sample_impl(
 
     std::vector<float> original_logits;
     auto cur_p = llama_sampling_prepare(ctx_sampling, ctx_main, ctx_cfg, idx, /* apply_grammar= */ is_resampling, &original_logits);
-    if (ctx_sampling->grammar != NULL && !is_resampling) {
+    if (!is_resampling) {
         GGML_ASSERT(!original_logits.empty());
     }
     llama_token id = 0;
@@ -320,7 +280,7 @@ static llama_token llama_sampling_sample_impl(
         }
     }
 
-    if (ctx_sampling->grammar != NULL && !is_resampling) {
+    if (!is_resampling) {
         // Get a pointer to the logits
         float * logits = llama_get_logits_ith(ctx_main, idx);
 
@@ -329,7 +289,7 @@ static llama_token llama_sampling_sample_impl(
         llama_token_data_array single_token_data_array = { &single_token_data, 1, false };
 
         // Apply grammar constraints to the single token
-        llama_grammar_sample(ctx_sampling->grammar, ctx_main, &single_token_data_array);
+        llama_sampling_grammar(ctx_sampling->smpl, &single_token_data_array);
 
         // Check if the token is valid according to the grammar by seeing if its logit has been set to -INFINITY
         bool is_valid = single_token_data_array.data[0].logit != -INFINITY;
@@ -376,7 +336,7 @@ static llama_token_data_array llama_sampling_prepare_impl(
     // Get a pointer to the logits
     float * logits = llama_get_logits_ith(ctx_main, idx);
 
-    if (ctx_sampling->grammar != NULL && !apply_grammar) {
+    if (!apply_grammar) {
         GGML_ASSERT(original_logits != NULL);
         // Only make a copy of the original logits if we are not applying grammar checks, not sure if I actually have to do this.
         *original_logits = {logits, logits + n_vocab};
@@ -421,8 +381,8 @@ static llama_token_data_array llama_sampling_prepare_impl(
     }
 
     // apply grammar checks before sampling logic
-    if (apply_grammar && ctx_sampling->grammar != NULL) {
-        llama_grammar_sample(ctx_sampling->grammar, ctx_main, &cur_p);
+    if (apply_grammar) {
+        llama_sampling_grammar(ctx_sampling->smpl, &cur_p);
     }
 
     return cur_p;
@@ -449,13 +409,12 @@ llama_token_data_array llama_sampling_prepare(
 
 void llama_sampling_accept(
         struct llama_sampling_context * ctx_sampling,
-        struct llama_context * ctx_main,
         llama_token id,
         bool apply_grammar) {
     ctx_sampling->prev.erase(ctx_sampling->prev.begin());
     ctx_sampling->prev.push_back(id);
 
-    if (ctx_sampling->grammar != NULL && apply_grammar) {
-        llama_grammar_accept_token(ctx_sampling->grammar, ctx_main, id);
+    if (apply_grammar) {
+        llama_sampling_accept(ctx_sampling->smpl, id);
     }
 }

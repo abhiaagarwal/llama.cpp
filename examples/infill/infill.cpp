@@ -2,7 +2,6 @@
 
 #include "console.h"
 #include "llama.h"
-#include "grammar-parser.h"
 
 #include <cassert>
 #include <cinttypes>
@@ -94,7 +93,7 @@ static void sigint_handler(int signo) {
         } else {
             console::cleanup();
             printf("\n");
-            llama_print_timings(*g_ctx, (*g_ctx_sampling)->smpl, (*g_ctx_sampling)->grammar);
+            llama_print_timings(*g_ctx, (*g_ctx_sampling)->smpl);
             write_logfile(*g_ctx, *g_params, *g_model, *g_input_tokens, g_output_ss->str(), *g_output_tokens);
             _exit(130);
         }
@@ -423,7 +422,7 @@ int main(int argc, char ** argv) {
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
             const llama_token id = llama_sampling_sample(ctx_sampling, ctx, nullptr);
 
-            llama_sampling_accept(ctx_sampling, ctx, id, true);
+            llama_sampling_accept(ctx_sampling, id, true);
 
             LOG("last: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, ctx_sampling->prev).c_str());
 
@@ -444,7 +443,7 @@ int main(int argc, char ** argv) {
 
                 // push the prompt in the sampling context in order to apply repetition penalties later
                 // for the prompt, we don't apply grammar rules
-                llama_sampling_accept(ctx_sampling, ctx, embd_inp[n_consumed], false);
+                llama_sampling_accept(ctx_sampling, embd_inp[n_consumed], false);
 
                 ++n_consumed;
                 if ((int) embd.size() >= params.n_batch) {
@@ -638,7 +637,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
     }
 
-    llama_print_timings(ctx, ctx_sampling->smpl, ctx_sampling->grammar);
+    llama_print_timings(ctx, ctx_sampling->smpl);
     write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 
     llama_free(ctx);

@@ -3,7 +3,6 @@
 #include "common.h"
 #include "json-schema-to-grammar.h"
 #include "llama.h"
-#include "grammar-parser.h"
 
 #ifndef NDEBUG
 // crash the server in debug mode, otherwise send an http 500 error
@@ -664,7 +663,6 @@ struct server_context {
         // Clear any sampling context
         for (server_slot & slot : slots) {
             if (slot.ctx_sampling != nullptr) {
-                llama_sampling_free(slot.ctx_sampling->smpl);
                 llama_sampling_free(slot.ctx_sampling);
             }
         }
@@ -1089,11 +1087,10 @@ struct server_context {
 
         {
             if (slot.ctx_sampling != nullptr) {
-                llama_sampling_free(slot.ctx_sampling->smpl);
                 llama_sampling_free(slot.ctx_sampling);
             }
 
-            slot.ctx_sampling = llama_sampling_init(slot.sparams, llama_sampling_init(llama_n_vocab(model)));
+            slot.ctx_sampling = llama_sampling_init(slot.sparams, model);
             if (slot.ctx_sampling == nullptr) {
                 // for now, the only error that may happen here is invalid grammar
                 send_error(task, "Failed to parse grammar", ERROR_TYPE_INVALID_REQUEST);
@@ -2155,7 +2152,7 @@ struct server_context {
 
                                 // push the prompt into the sampling context (do not apply grammar)
                                 for (int i = 0; i < slot.n_past; ++i) {
-                                    llama_sampling_accept(slot.ctx_sampling, ctx, slot.cache_tokens[i], false);
+                                    llama_sampling_accept(slot.ctx_sampling, slot.cache_tokens[i], false);
                                 }
                             }
                         }
@@ -2387,7 +2384,7 @@ struct server_context {
                 completion_token_output result;
                 const llama_token id = llama_sampling_sample(slot.ctx_sampling, ctx, NULL, slot.i_batch - i);
 
-                llama_sampling_accept(slot.ctx_sampling, ctx, id, true);
+                llama_sampling_accept(slot.ctx_sampling, id, true);
 
                 slot.n_decoded += 1;
                 if (slot.n_decoded == 1) {

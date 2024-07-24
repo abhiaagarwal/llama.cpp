@@ -51,7 +51,6 @@ static std::vector<std::string> k_prompts = {
 struct client {
     ~client() {
         if (ctx_sampling) {
-            llama_sampling_free(ctx_sampling->smpl);
             llama_sampling_free(ctx_sampling);
         }
     }
@@ -162,7 +161,7 @@ int main(int argc, char ** argv) {
     for (size_t i = 0; i < clients.size(); ++i) {
         auto & client = clients[i];
         client.id = i;
-        client.ctx_sampling = llama_sampling_init(params.sparams, llama_sampling_init(llama_n_vocab(model)));
+        client.ctx_sampling = llama_sampling_init(params.sparams, model);
     }
 
     std::vector<llama_token> tokens_system;
@@ -344,7 +343,7 @@ int main(int argc, char ** argv) {
 
                 const llama_token id = llama_sampling_sample(client.ctx_sampling, ctx, NULL, client.i_batch - i);
 
-                llama_sampling_accept(client.ctx_sampling, ctx, id, true);
+                llama_sampling_accept(client.ctx_sampling, id, true);
 
                 if (client.n_decoded == 1) {
                     // start measuring generation time after the first token to make sure all concurrent clients
@@ -415,7 +414,7 @@ int main(int argc, char ** argv) {
     LOG_TEE("\n");
 
     // TODO: print sampling/grammar timings for all clients
-    llama_print_timings(ctx, nullptr, nullptr);
+    llama_print_timings(ctx, nullptr);
 
     llama_batch_free(batch);
 

@@ -55,6 +55,7 @@ extern "C" {
     // TODO: show sample usage
     //
 
+    // struct llama_vocab; // TODO: add in the future
     struct llama_model;
     struct llama_context;
 
@@ -357,43 +358,6 @@ extern "C" {
         void * kv_overrides;                 // pointer to vector containing overrides
     } llama_model_quantize_params;
 
-    // grammar types
-    struct llama_grammar;
-
-    // grammar element type
-    enum llama_gretype {
-        // end of rule definition
-        LLAMA_GRETYPE_END            = 0,
-
-        // start of alternate definition for rule
-        LLAMA_GRETYPE_ALT            = 1,
-
-        // non-terminal element: reference to rule
-        LLAMA_GRETYPE_RULE_REF       = 2,
-
-        // terminal element: character (code point)
-        LLAMA_GRETYPE_CHAR           = 3,
-
-        // inverse char(s) ([^a], [^a-b] [^abc])
-        LLAMA_GRETYPE_CHAR_NOT       = 4,
-
-        // modifies a preceding LLAMA_GRETYPE_CHAR or LLAMA_GRETYPE_CHAR_ALT to
-        // be an inclusive range ([a-z])
-        LLAMA_GRETYPE_CHAR_RNG_UPPER = 5,
-
-        // modifies a preceding LLAMA_GRETYPE_CHAR or
-        // LLAMA_GRETYPE_CHAR_RNG_UPPER to add an alternate char to match ([ab], [a-zA])
-        LLAMA_GRETYPE_CHAR_ALT       = 6,
-
-        // any character (.)
-        LLAMA_GRETYPE_CHAR_ANY       = 7,
-    };
-
-    typedef struct llama_grammar_element {
-        enum llama_gretype type;
-        uint32_t           value; // Unicode code point or rule ID
-    } llama_grammar_element;
-
     // sampling types
     struct llama_sampling;
 
@@ -460,23 +424,22 @@ extern "C" {
     LLAMA_API bool llama_supports_mlock      (void);
     LLAMA_API bool llama_supports_gpu_offload(void);
 
-    LLAMA_API const struct llama_model    * llama_get_model   (const struct llama_context * ctx);
-    LLAMA_API       struct llama_sampling * llama_get_sampling(      struct llama_context * ctx);
-
     LLAMA_API uint32_t llama_n_ctx      (const struct llama_context * ctx);
     LLAMA_API uint32_t llama_n_batch    (const struct llama_context * ctx);
     LLAMA_API uint32_t llama_n_ubatch   (const struct llama_context * ctx);
     LLAMA_API uint32_t llama_n_seq_max  (const struct llama_context * ctx);
 
-    LLAMA_API enum llama_pooling_type llama_pooling_type(const struct llama_context * ctx);
-
-    LLAMA_API enum llama_vocab_type   llama_vocab_type  (const struct llama_model * model);
-    LLAMA_API enum llama_rope_type    llama_rope_type   (const struct llama_model * model);
-
     LLAMA_API int32_t llama_n_vocab    (const struct llama_model * model);
     LLAMA_API int32_t llama_n_ctx_train(const struct llama_model * model);
     LLAMA_API int32_t llama_n_embd     (const struct llama_model * model);
     LLAMA_API int32_t llama_n_layer    (const struct llama_model * model);
+
+    LLAMA_API const struct llama_model    * llama_get_model   (const struct llama_context * ctx);
+    LLAMA_API       struct llama_sampling * llama_get_sampling(      struct llama_context * ctx);
+
+    LLAMA_API enum llama_pooling_type llama_pooling_type(const struct llama_context * ctx);
+    LLAMA_API enum llama_vocab_type   llama_vocab_type  (const struct llama_model * model);
+    LLAMA_API enum llama_rope_type    llama_rope_type   (const struct llama_model * model);
 
     // Get the model's RoPE frequency scaling factor
     LLAMA_API float llama_rope_freq_scale_train(const struct llama_model * model);
@@ -1000,78 +963,26 @@ extern "C" {
                                int32_t   length);
 
     //
-    // Grammar
-    //
-
-    /// Initialize a llama_grammar.
-    ///
-    /// @param rules The rule elements of the grammar to initialize.
-    /// @param n_rules The number of rules.
-    /// @param start_rule_index The index of the root rule (the starting point of the grammar).
-    /// @return The initialized llama_grammar or nullptr if initialization failed.
-    LLAMA_API struct llama_grammar * llama_grammar_init(
-            const llama_grammar_element ** rules,
-                                 size_t    n_rules,
-                                 size_t    start_rule_index);
-
-    LLAMA_API void llama_grammar_free(struct llama_grammar * grammar);
-
-    LLAMA_API struct llama_grammar * llama_grammar_copy(const struct llama_grammar * grammar);
-
-    /// @details Apply constraints from grammar
-    LLAMA_API void llama_grammar_sample(
-            const struct llama_grammar * grammar,
-            const struct llama_context * ctx,
-                llama_token_data_array * candidates);
-    LLAMA_API DEPRECATED(void llama_sample_grammar(
-            struct llama_context * ctx,
-          llama_token_data_array * candidates,
-      const struct llama_grammar * grammar),
-        "use llama_grammar_sample instead");
-
-    /// @details Accepts the sampled token into the grammar
-    LLAMA_API void llama_grammar_accept_token(
-            struct llama_grammar * grammar,
-            struct llama_context * ctx,
-                     llama_token   token);
-
-    //
     // Sampling functions
     //
 
     // TODO: args become llama_sampling_params
-    LLAMA_API struct llama_sampling * llama_sampling_init(int32_t n_vocab);
+    // TODO: llama_model should become llama_vocab
+    LLAMA_API struct llama_sampling * llama_sampling_init(const struct llama_model * model, const char * grammar_str, const char * grammar_root);
 
     LLAMA_API void llama_sampling_free(struct llama_sampling * smpl);
+
+    LLAMA_API struct llama_sampling * llama_sampling_cp(const struct llama_sampling * smpl);
+
+    LLAMA_API void llama_sampling_reset(struct llama_sampling * smpl, const char * grammar_str, const char * grammar_root);
 
     // Sets the current rng seed.
     LLAMA_API void llama_sampling_set_rng_seed(struct llama_sampling * smpl, uint32_t seed);
 
-    /// @details Repetition penalty described in CTRL academic paper https://arxiv.org/abs/1909.05858, with negative logit fix.
-    /// @details Frequency and presence penalties described in OpenAI API https://platform.openai.com/docs/api-reference/parameter-details.
-    LLAMA_API void llama_sampling_repetition_penalties(
-            struct llama_sampling * smpl,
-           llama_token_data_array * candidates,
-                const llama_token * last_tokens,
-                           size_t   penalty_last_n,
-                            float   penalty_repeat,
-                            float   penalty_freq,
-                            float   penalty_present);
-
-    /// @details Apply classifier-free guidance to the logits as described in academic paper "Stay on topic with Classifier-Free Guidance" https://arxiv.org/abs/2306.17806
-    /// @param logits Logits extracted from the original generation context.
-    /// @param logits_guidance Logits extracted from a separate context from the same model. Other than a negative prompt at the beginning, it should have all generated and user input tokens copied from the main context.
-    /// @param scale Guidance strength. 1.0f means no guidance. Higher values mean stronger guidance.
-    LLAMA_API void llama_sampling_apply_guidance(
-              struct llama_sampling * smpl,
-                              float * logits,
-                              float * logits_guidance,
-                              float   scale);
-
     /// @details Sorts candidate tokens by their logits in descending order and calculate probabilities based on logits.
     LLAMA_API void llama_sampling_softmax(
             struct llama_sampling * smpl,
-          llama_token_data_array * candidates);
+           llama_token_data_array * candidates);
 
     /// @details Top-K sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
     LLAMA_API void llama_sampling_top_k(
@@ -1121,6 +1032,32 @@ extern "C" {
            llama_token_data_array * candidates,
                             float   temp);
 
+    /// @details Apply constraints from grammar
+    LLAMA_API void llama_sampling_grammar(
+            struct llama_sampling * smpl,
+           llama_token_data_array * candidates);
+
+    /// @details Repetition penalty described in CTRL academic paper https://arxiv.org/abs/1909.05858, with negative logit fix.
+    /// @details Frequency and presence penalties described in OpenAI API https://platform.openai.com/docs/api-reference/parameter-details.
+    LLAMA_API void llama_sampling_repetition_penalties(
+            struct llama_sampling * smpl,
+           llama_token_data_array * candidates,
+                const llama_token * last_tokens,
+                           size_t   penalty_last_n,
+                            float   penalty_repeat,
+                            float   penalty_freq,
+                            float   penalty_present);
+
+    /// @details Apply classifier-free guidance to the logits as described in academic paper "Stay on topic with Classifier-Free Guidance" https://arxiv.org/abs/2306.17806
+    /// @param logits Logits extracted from the original generation context.
+    /// @param logits_guidance Logits extracted from a separate context from the same model. Other than a negative prompt at the beginning, it should have all generated and user input tokens copied from the main context.
+    /// @param scale Guidance strength. 1.0f means no guidance. Higher values mean stronger guidance.
+    LLAMA_API void llama_sampling_apply_guidance(
+            struct llama_sampling * smpl,
+                            float * logits,
+                            float * logits_guidance,
+                            float   scale);
+
     /// @details Mirostat 1.0 algorithm described in the paper https://arxiv.org/abs/2007.14966. Uses tokens instead of words.
     /// @param candidates A vector of `llama_token_data` containing the candidate tokens, their probabilities (p), and log-odds (logit) for the current position in the generated text.
     /// @param tau  The target cross-entropy (or surprise) value you want to achieve for the generated text. A higher value corresponds to more surprising or less predictable text, while a lower value corresponds to less surprising or more predictable text.
@@ -1153,10 +1090,15 @@ extern "C" {
             struct llama_sampling * smpl,
            llama_token_data_array * candidates);
 
-    /// @details Randomly selects a token from the candidates based on their probabilities using RNG[0] of smpl.
+    /// @details Randomly selects a token from the candidates based on their probabilities
     LLAMA_API llama_token llama_sampling_sample(
             struct llama_sampling * smpl,
            llama_token_data_array * candidates);
+
+    /// @details Accepts the sampled token into the grammar
+    LLAMA_API void llama_sampling_accept(
+            struct llama_sampling * smpl,
+                      llama_token   token);
 
     //
     // Model split
@@ -1175,8 +1117,8 @@ extern "C" {
     // Performance information
     LLAMA_API struct llama_timings llama_get_timings(struct llama_context * ctx);
 
-    LLAMA_API void llama_print_timings(struct llama_context * ctx, struct llama_sampling * smpl, struct llama_grammar * grammar);
-    LLAMA_API void llama_reset_timings(struct llama_context * ctx, struct llama_sampling * smpl, struct llama_grammar * grammar);
+    LLAMA_API void llama_print_timings(struct llama_context * ctx, struct llama_sampling * smpl);
+    LLAMA_API void llama_reset_timings(struct llama_context * ctx, struct llama_sampling * smpl);
 
     // Print system information
     LLAMA_API const char * llama_print_system_info(void);

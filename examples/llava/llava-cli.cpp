@@ -44,7 +44,7 @@ static const char * sample(struct llama_sampling_context * ctx_sampling,
                            struct llama_context * ctx_llama,
                            int * n_past) {
     const llama_token id = llama_sampling_sample(ctx_sampling, ctx_llama, NULL);
-    llama_sampling_accept(ctx_sampling, ctx_llama, id, true);
+    llama_sampling_accept(ctx_sampling, id, true);
     static std::string ret;
     if (llama_token_is_eog(llama_get_model(ctx_llama), id)) {
         ret = "</s>";
@@ -310,7 +310,7 @@ int main(int argc, char ** argv) {
         // process the prompt
         process_prompt(ctx_llava, image_embed, &params, params.prompt);
 
-        llama_print_timings(ctx_llava->ctx_llama, nullptr, nullptr);
+        llama_print_timings(ctx_llava->ctx_llama, nullptr);
         llava_image_embed_free(image_embed);
         ctx_llava->model = NULL;
         llava_free(ctx_llava);
@@ -327,7 +327,7 @@ int main(int argc, char ** argv) {
             // process the prompt
             process_prompt(ctx_llava, image_embed, &params, params.prompt);
 
-            llama_print_timings(ctx_llava->ctx_llama, nullptr, nullptr);
+            llama_print_timings(ctx_llava->ctx_llama, nullptr);
             llava_image_embed_free(image_embed);
             ctx_llava->model = NULL;
             llava_free(ctx_llava);

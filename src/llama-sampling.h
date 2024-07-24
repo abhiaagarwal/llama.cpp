@@ -1,13 +1,21 @@
 #pragma once
 
 #include "llama-impl.h"
+#include "llama-grammar.h"
+
+struct llama_vocab;
+struct llama_grammar;
 
 struct llama_sampling {
-    llama_sampling(int32_t n_vocab) : n_vocab(n_vocab) {}
+    llama_sampling(uint32_t n_vocab);
+    llama_sampling(const struct llama_vocab & vocab, const char * grammar_str, const char * grammar_root);
+    ~llama_sampling();
 
-    const int32_t n_vocab;
+    const uint32_t n_vocab;
 
     std::mt19937 rng;
+
+    struct llama_grammar * grammar = nullptr;
 
     mutable int64_t t_total_us = 0;
 
@@ -18,10 +26,15 @@ struct llama_sampling {
 // internal API
 //
 
-struct llama_sampling * llama_sampling_init_impl(int32_t n_vocab);
+struct llama_sampling * llama_sampling_init_impl(const struct llama_vocab & vocab, const char * grammar_str, const char * grammar_root);
 
 void llama_sampling_free_impl(struct llama_sampling * sampling);
 
+struct llama_sampling * llama_sampling_cp_impl(const struct llama_sampling & smpl);
+
+void llama_sampling_reset_impl(struct llama_sampling & smpl, const char * grammar_str, const char * grammar_root);
+
+// TODO: move the API below as member functions of llama_sampling
 void llama_sampling_set_rng_seed_impl(struct llama_sampling & smpl, uint32_t seed);
 
 void llama_sampling_softmax_impl  (struct llama_sampling & smpl, llama_token_data_array * candidates);
@@ -32,6 +45,7 @@ void llama_sampling_tail_free_impl(struct llama_sampling & smpl, llama_token_dat
 void llama_sampling_typical_impl  (struct llama_sampling & smpl, llama_token_data_array * candidates, float p, size_t min_keep);
 void llama_sampling_entropy_impl  (struct llama_sampling & smpl, llama_token_data_array * candidates, float min_temp, float max_temp, float exponent_val);
 void llama_sampling_temp_impl     (struct llama_sampling & smpl, llama_token_data_array * candidates, float temp);
+void llama_sampling_grammar_impl  (struct llama_sampling & smpl, llama_token_data_array * candidates);
 
 void llama_sampling_repetition_penalties_impl(
         struct llama_sampling & smpl,
@@ -54,3 +68,4 @@ llama_token llama_sampling_sample_greedy_impl     (struct llama_sampling & smpl,
 llama_token llama_sampling_sample_with_rng_impl   (struct llama_sampling & smpl, llama_token_data_array * candidates, std::mt19937 & rng);
 llama_token llama_sampling_sample_impl            (struct llama_sampling & smpl, llama_token_data_array * candidates);
 
+void llama_sampling_accept_impl(struct llama_sampling & smpl, llama_token token);
