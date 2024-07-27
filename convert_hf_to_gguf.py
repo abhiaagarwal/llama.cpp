@@ -605,7 +605,7 @@ class Model:
             res = "smollm"
         if chkhsh == "d4540891389ea895b53b399da6ac824becc30f2fba0e9ddbb98f92e55ca0e97c":
             # ref: https://huggingface.co/dunzhang/stella_en_1.5B_v5
-            res = "stella-en-1.5"
+            res = "stella-en"
 
         if res is None:
             logger.warning("\n")
