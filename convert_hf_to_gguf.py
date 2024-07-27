@@ -603,6 +603,9 @@ class Model:
         if chkhsh == "855059429035d75a914d1eda9f10a876752e281a054a7a3d421ef0533e5b6249":
             # ref: https://huggingface.co/HuggingFaceTB/SmolLM-135M
             res = "smollm"
+        if chkhsh == "d4540891389ea895b53b399da6ac824becc30f2fba0e9ddbb98f92e55ca0e97c":
+            # ref: https://huggingface.co/dunzhang/stella_en_1.5B_v5
+            res = "stella-en-1.5"
 
         if res is None:
             logger.warning("\n")

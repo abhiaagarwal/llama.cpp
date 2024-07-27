@@ -94,6 +94,7 @@ models = [
     {"name": "codeshell",      "tokt": TOKENIZER_TYPE.BPE, "repo": "https://huggingface.co/WisdomShell/CodeShell-7B", },
     {"name": "tekken",         "tokt": TOKENIZER_TYPE.BPE, "repo": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407", },
     {"name": "smollm",         "tokt": TOKENIZER_TYPE.BPE, "repo": "https://huggingface.co/HuggingFaceTB/SmolLM-135M", },
+    {"name": "stella-en-1.5",  "tokt": TOKENIZER_TYPE.BPE, "repo": "https://huggingface.co/dunzhang/stella_en_1.5B_v5", },
 ]
 
 
